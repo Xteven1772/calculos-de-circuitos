@@ -3,4 +3,6 @@ dash-bootstrap-components
 plotly
 numpy
 python-docx
-pdfkit
+pandas
+io
+base64
