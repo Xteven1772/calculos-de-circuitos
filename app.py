@@ -3,6 +3,9 @@ from dash import html, dcc, Input, Output, State, ctx
 import dash_bootstrap_components as dbc
 import plotly.graph_objs as go
 import numpy as np
+from docx import Document
+import base64
+import io
 
 app = dash.Dash(
     __name__,
@@ -82,6 +85,25 @@ def formatear_valor(valor):
     else:
         return f"{valor*1e9:.3f} nA"
 
+def exportar_a_word(resultados_dict):
+    doc = Document()
+    doc.add_heading('Resultados del Análisis BJT', 0)
+    table = doc.add_table(rows=1, cols=2)
+    hdr_cells = table.rows[0].cells
+    hdr_cells[0].text = 'Parámetro'
+    hdr_cells[1].text = 'Valor'
+
+    for clave, valor in resultados_dict.items():
+        row_cells = table.add_row().cells
+        row_cells[0].text = clave
+        row_cells[1].text = valor
+
+    buffer = io.BytesIO()
+    doc.save(buffer)
+    buffer.seek(0)
+    b64 = base64.b64encode(buffer.read()).decode('utf-8')
+    return f"data:application/vnd.openxmlformats-officedocument.wordprocessingml.document;base64,{b64}"
+
 # ----- Lógica principal -----
 
 def calcular_y_graficar(config, Vcc, Rc, Rb, Re, beta, Vbe):
@@ -93,7 +115,7 @@ def calcular_y_graficar(config, Vcc, Rc, Rb, Re, beta, Vbe):
         beta = float(beta)
         Vbe = interpretar_valor(Vbe)
     except:
-        return html.Div("⚠️ Error en los valores ingresados. Revisa los campos en rojo."), go.Figure()
+        return html.Div("⚠️ Error en los valores ingresados. Revisa los campos en rojo."), go.Figure(), {}
 
     faltantes = []
     for nombre, valor in zip(["Vcc", "Rc", "Rb", "Re", "β", "Vbe"], [Vcc, Rc, Rb, Re, beta, Vbe]):
@@ -101,7 +123,7 @@ def calcular_y_graficar(config, Vcc, Rc, Rb, Re, beta, Vbe):
             faltantes.append(nombre)
 
     if faltantes:
-        return html.Div(f"⚠️ Valores faltantes: {', '.join(faltantes)}"), go.Figure()
+        return html.Div(f"⚠️ Valores faltantes: {', '.join(faltantes)}"), go.Figure(), {}
 
     Ib = Ic = Ie = Vb = Ve = Vc = Vce = Vbc = 0
 
@@ -134,21 +156,25 @@ def calcular_y_graficar(config, Vcc, Rc, Rb, Re, beta, Vbe):
 
     estado = "SATURACIÓN" if Vce < 0.2 else "ACTIVA" if Ic > 0 else "CORTE"
 
+    resultados_dict = {
+        "Estado del transistor": estado,
+        "Ib": formatear_valor(Ib),
+        "Ic": formatear_valor(Ic),
+        "Ie": formatear_valor(Ie),
+        "Vb": f"{Vb:.2f} V",
+        "Ve": f"{Ve:.2f} V",
+        "Vc": f"{Vc:.2f} V",
+        "Vce": f"{Vce:.2f} V",
+        "Vbc": f"{Vbc:.2f} V",
+        "Ic(sat)": formatear_valor(Ic_sat),
+        "Vce(sat)": f"{Vce_sat:.2f} V",
+        "Pmax": f"{Pmax:.3f} W"
+    }
+
     resultados = html.Table([
         html.Thead(html.Tr([html.Th("Parámetro"), html.Th("Valor")])),
         html.Tbody([
-            html.Tr([html.Td("Estado del transistor"), html.Td(estado)]),
-            html.Tr([html.Td("Ib"), html.Td(formatear_valor(Ib))]),
-            html.Tr([html.Td("Ic"), html.Td(formatear_valor(Ic))]),
-            html.Tr([html.Td("Ie"), html.Td(formatear_valor(Ie))]),
-            html.Tr([html.Td("Vb"), html.Td(f"{Vb:.2f} V")]),
-            html.Tr([html.Td("Ve"), html.Td(f"{Ve:.2f} V")]),
-            html.Tr([html.Td("Vc"), html.Td(f"{Vc:.2f} V")]),
-            html.Tr([html.Td("Vce"), html.Td(f"{Vce:.2f} V")]),
-            html.Tr([html.Td("Vbc"), html.Td(f"{Vbc:.2f} V")]),
-            html.Tr([html.Td("Ic(sat)"), html.Td(formatear_valor(Ic_sat))]),
-            html.Tr([html.Td("Vce(sat)"), html.Td(f"{Vce_sat:.2f} V")]),
-            html.Tr([html.Td("Pmax"), html.Td(f"{Pmax:.3f} W")])
+            html.Tr([html.Td(k), html.Td(v)]) for k, v in resultados_dict.items()
         ])
     ], className="table table-dark table-striped soft-box")
 
@@ -157,7 +183,7 @@ def calcular_y_graficar(config, Vcc, Rc, Rb, Re, beta, Vbe):
     fig.add_trace(go.Scatter(x=[Vce], y=[Ic], mode='markers', name='Punto Q', marker=dict(size=10, color='red')))
     fig.update_layout(title="Recta de carga y punto Q", xaxis_title="VCE (V)", yaxis_title="IC (A)", template="plotly_dark")
 
-    return resultados, fig
+    return resultados, fig, resultados_dict
 
 # ----- Diseño principal -----
 
@@ -184,7 +210,9 @@ app.layout = dbc.Container([
                         dbc.Input(id=campo, placeholder=campo, type="text", className="mb-2", value="")
                     ]) for campo in ["Vcc", "Rc", "Rb", "Re", "β", "Vbe"]
                 ],
-                dbc.Button("Calcular", id="btn-calc", className="btn btn-success mt-2")
+                dbc.Button("Calcular", id="btn-calc", className="btn btn-success mt-2"),
+                html.Br(),
+                html.A("Descargar Word", id="descarga-word", href="", download="resultado.docx", target="_blank", className="btn btn-secondary mt-2", style={"display": "none"})
             ], className="soft-box")
         ], md=4),
 
@@ -201,6 +229,8 @@ app.layout = dbc.Container([
 
 @app.callback(
     Output("contenido_tab", "children"),
+    Output("descarga-word", "href"),
+    Output("descarga-word", "style"),
     Input("tabs", "value"),
     Input("btn-calc", "n_clicks"),
     State("config", "value"),
@@ -209,13 +239,16 @@ app.layout = dbc.Container([
 )
 def actualizar_tabs(tab, n, config, Vcc, Rc, Rb, Re, beta, Vbe):
     if not n:
-        return ""
-    resultados, grafico = calcular_y_graficar(config, Vcc, Rc, Rb, Re, beta, Vbe)
+        return "", "", {"display": "none"}
+
+    resultados, grafico, resultados_dict = calcular_y_graficar(config, Vcc, Rc, Rb, Re, beta, Vbe)
+
+    href_word = exportar_a_word(resultados_dict)
 
     if tab == "tab1":
-        return resultados
+        return resultados, href_word, {"display": "inline-block"}
     elif tab == "tab2":
-        return dcc.Graph(figure=grafico)
+        return dcc.Graph(figure=grafico), href_word, {"display": "inline-block"}
     elif tab == "tab3":
         try:
             Vce_range = np.linspace(0, interpretar_valor(Vcc), 100)
@@ -225,9 +258,9 @@ def actualizar_tabs(tab, n, config, Vcc, Rc, Rb, Re, beta, Vbe):
             fig_curvas = go.Figure()
             fig_curvas.add_trace(go.Scatter(x=Vce_range, y=Ic_curva, mode='lines', name='Curva IC vs VCE'))
             fig_curvas.update_layout(title="Curva Dinámica IC vs VCE", xaxis_title="VCE (V)", yaxis_title="IC (A)", template="plotly_dark")
-            return dcc.Graph(figure=fig_curvas)
+            return dcc.Graph(figure=fig_curvas), href_word, {"display": "inline-block"}
         except:
-            return html.Div("Error al calcular curva dinámica. Revisa los valores.")
+            return html.Div("Error al calcular curva dinámica. Revisa los valores."), href_word, {"display": "inline-block"}
 
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 8050))  # Usa el puerto de Render o 8050 por defecto
