@@ -1,4 +1,4 @@
-import dash
+rimport dash
 from dash import html, dcc, Input, Output, State
 import dash_bootstrap_components as dbc
 import plotly.graph_objs as go
@@ -164,4 +164,4 @@ def actualizar_tabs(tab, n, config, Vcc, Rc, Rb, Re, beta, Vbe):
         return dcc.Graph(figure=fig_curvas)
 
 if __name__ == "__main__":
-    app.run(debug=True)
+    app.run_server(debug=True)
