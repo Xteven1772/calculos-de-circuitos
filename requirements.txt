@@ -4,5 +4,3 @@ plotly
 numpy
 python-docx
 pandas
-io
-base64
