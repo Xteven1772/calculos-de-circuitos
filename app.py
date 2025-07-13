@@ -230,4 +230,5 @@ def actualizar_tabs(tab, n, config, Vcc, Rc, Rb, Re, beta, Vbe):
             return html.Div("Error al calcular curva dinámica. Revisa los valores.")
 
 if __name__ == "__main__":
-    app.run(debug=True)
+    port = int(os.environ.get("PORT", 8050))  # Usa el puerto de Render o 8050 por defecto
+    app.run(host="0.0.0.0", port=port, debug=True)
