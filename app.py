@@ -164,4 +164,4 @@ def actualizar_tabs(tab, n, config, Vcc, Rc, Rb, Re, beta, Vbe):
         return dcc.Graph(figure=fig_curvas)
 
 if __name__ == "__main__":
-    app.run_server(debug=True)
+    app.run(debug=True)
