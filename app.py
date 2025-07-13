@@ -1,4 +1,5 @@
 import dash
+import os
 from dash import html, dcc, Input, Output, State
 import dash_bootstrap_components as dbc
 import plotly.graph_objs as go
@@ -164,4 +165,5 @@ def actualizar_tabs(tab, n, config, Vcc, Rc, Rb, Re, beta, Vbe):
         return dcc.Graph(figure=fig_curvas)
 
 if __name__ == "__main__":
-    app.run(debug=True)
+    port = int(os.environ.get("PORT", 8050))  # Usa el puerto de Render o 8050 por defecto
+    app.run(host="0.0.0.0", port=port, debug=True)
